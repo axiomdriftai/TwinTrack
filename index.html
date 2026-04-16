@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TwinTrack · Axiom Drift AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;1,400&family=Instrument+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f4f0e8;
+      --surface: rgba(255,255,255,0.46);
+      --surface-strong: rgba(255,255,255,0.72);
+      --line: rgba(40,38,33,0.14);
+      --line-strong: rgba(40,38,33,0.28);
+      --text: #1f1d19;
+      --text-muted: #5c564e;
+      --accent: #455241;
+      --accent-soft: rgba(69,82,65,0.12);
+      --accent-warm: #8a775c;
+      --shadow: 0 20px 50px rgba(41,35,27,0.08);
+      --radius: 24px;
+      --radius-sm: 16px;
+      --transition: 220ms ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: 'Instrument Sans', sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(138,119,92,0.1), transparent 34%),
+        linear-gradient(180deg, #f7f3eb 0%, var(--bg) 100%);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    .app { display: flex; flex-direction: column; min-height: 100vh; }
+    .app-header {
+      padding: 18px 32px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(244,240,232,0.82);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+      position: sticky; top: 0; z-index: 20;
+    }
+    .app-title { font-family: 'Newsreader', serif; font-size: 1.5rem; font-weight: 500; letter-spacing: -0.02em; margin: 0; }
+    .app-tag   { font-size: 0.75rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); }
+    .app-body { display: flex; flex: 1; }
+    /* ---- Controls ---- */
+    .controls {
+      width: 264px; flex-shrink: 0;
+      padding: 24px 22px;
+      border-right: 1px solid var(--line);
+      background: rgba(244,240,232,0.44);
+      display: flex; flex-direction: column; gap: 22px;
+      overflow-y: auto;
+    }
+    .ctrl-group { display: flex; flex-direction: column; gap: 12px; }
+    .ctrl-label { font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); margin: 0; }
+    hr.ctrl-div { border: none; border-top: 1px solid var(--line); margin: 0; }
+    select {
+      font-family: 'Instrument Sans', sans-serif; font-size: 0.86rem; color: var(--text);
+      background: var(--surface-strong); border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+      padding: 9px 32px 9px 12px; width: 100%; cursor: pointer;
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235c564e'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center;
+      transition: border-color var(--transition);
+    }
+    select:focus { outline: none; border-color: var(--accent); }
+    .profile-desc { font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; font-style: italic; }
+    .slider-row { display: flex; flex-direction: column; gap: 5px; }
+    .slider-header { display: flex; justify-content: space-between; align-items: baseline; }
+    .slider-name { font-size: 0.84rem; color: var(--text); }
+    .slider-val { font-size: 0.8rem; font-variant-numeric: tabular-nums; color: var(--accent); font-weight: 500; min-width: 32px; text-align: right; }
+    input[type="range"] { width: 100%; height: 4px; accent-color: var(--accent); cursor: pointer; margin: 2px 0; }
+    .check-opt { display: flex; align-items: center; gap: 9px; font-size: 0.86rem; color: var(--text); cursor: pointer; user-select: none; }
+    input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; width: 14px; height: 14px; flex-shrink: 0; }
+    /* ---- Main ---- */
+    .main {
+      flex: 1; padding: 28px 32px 32px;
+      display: flex; flex-direction: column; gap: 16px; min-width: 0;
+    }
+    .chart-card {
+      border: 1px solid var(--line); background: var(--surface);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 24px 28px 18px;
+      display: flex; flex-direction: column;
+    }
+    .chart-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+    .chart-title { font-family: 'Newsreader', serif; font-size: 1.1rem; font-weight: 500; letter-spacing: -0.02em; margin: 0; }
+    .chart-label { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+    .chart-wrap { position: relative; height: 240px; }
+    /* ---- Status card ---- */
+    .status-card {
+      border: 1px solid var(--line); border-radius: var(--radius-sm);
+      padding: 14px 18px; font-size: 0.87rem;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px;
+      transition: background var(--transition);
+    }
+    .stat-item { display: flex; flex-direction: column; gap: 2px; }
+    .stat-label { font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); }
+    .stat-value { font-size: 1rem; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--text); }
+    .stat-sub   { font-size: 0.78rem; color: var(--text-muted); }
+    .interp-card {
+      border: 1px solid rgba(69,82,65,0.2); border-radius: var(--radius-sm);
+      padding: 13px 18px; font-size: 0.87rem; color: var(--text-muted);
+      background: rgba(69,82,65,0.05);
+      grid-column: 1 / -1;
+    }
+    .interp-card strong { color: var(--text); font-weight: 500; }
+    .footer-note { font-size: 0.75rem; color: var(--text-muted); text-align: center; padding-bottom: 4px; letter-spacing: 0.04em; }
+    .footer-note a { color: var(--accent); text-decoration: none; }
+    .footer-note a:hover { text-decoration: underline; }
+    @media (max-width: 700px) {
+      .app-body { flex-direction: column; }
+      .controls { width: 100%; border-right: none; border-bottom: 1px solid var(--line); padding: 18px 20px; flex-direction: row; flex-wrap: wrap; }
+      .ctrl-group { flex: 1; min-width: 160px; }
+      hr.ctrl-div { display: none; }
+      .main { padding: 20px; }
+      .status-card { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <header class="app-header">
+    <h1 class="app-title">TwinTrack</h1>
+    <span class="app-tag">Input Regime Comparison · Axiom Drift AI</span>
+  </header>
+
+  <div class="app-body">
+    <aside class="controls">
+
+      <div class="ctrl-group">
+        <p class="ctrl-label">Synthetic profile</p>
+        <select id="profileSelect">
+          <option value="sparse">Sparse</option>
+          <option value="effusive">Effusive</option>
+          <option value="structured">Structured</option>
+        </select>
+        <p class="profile-desc" id="profileDesc"></p>
+      </div>
+
+      <hr class="ctrl-div">
+
+      <div class="ctrl-group">
+        <p class="ctrl-label">Rolling window</p>
+        <div class="slider-row">
+          <div class="slider-header">
+            <span class="slider-name">Window (turns)</span>
+            <span class="slider-val" id="windowVal">25</span>
+          </div>
+          <input type="range" id="windowSlider" min="3" max="80" value="25" step="1">
+        </div>
+      </div>
+
+      <hr class="ctrl-div">
+
+      <div class="ctrl-group">
+        <p class="ctrl-label">Variance band</p>
+        <label class="check-opt"><input type="checkbox" id="showBand" checked> Show ± band</label>
+        <div class="slider-row" id="bandRow">
+          <div class="slider-header">
+            <span class="slider-name">Band width (σ)</span>
+            <span class="slider-val" id="bandVal">1.0</span>
+          </div>
+          <input type="range" id="bandSlider" min="0.5" max="3.0" value="1.0" step="0.5">
+        </div>
+      </div>
+
+      <hr class="ctrl-div">
+
+      <div class="ctrl-group">
+        <p class="ctrl-label">Scale</p>
+        <label class="check-opt"><input type="checkbox" id="sharedScale" checked> Shared y-axis</label>
+      </div>
+
+    </aside>
+
+    <main class="main">
+
+      <!-- Chalk panel -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <h2 class="chart-title">Chalk</h2>
+          <span class="chart-label">Human archive · model response tokens · normalized time</span>
+        </div>
+        <div class="chart-wrap"><canvas id="chalkChart"></canvas></div>
+      </div>
+
+      <!-- Profile panel -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <h2 class="chart-title" id="profileTitle">Sparse</h2>
+          <span class="chart-label" id="profileLabel">Synthetic profile · model response tokens · normalized time</span>
+        </div>
+        <div class="chart-wrap"><canvas id="profileChart"></canvas></div>
+      </div>
+
+      <!-- Comparison stats -->
+      <div class="status-card" id="statsCard">
+        <div class="stat-item">
+          <span class="stat-label">Chalk — mean response</span>
+          <span class="stat-value" id="chalkMean">—</span>
+          <span class="stat-sub" id="chalkStd">—</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label" id="profileStatLabel">Profile — mean response</span>
+          <span class="stat-value" id="profileMean">—</span>
+          <span class="stat-sub" id="profileStd">—</span>
+        </div>
+        <div class="interp-card" id="interpText"></div>
+      </div>
+
+      <p class="footer-note">
+        Each profile was designed to produce plausible-looking interaction.
+        TwinTrack asks whether input regime alone can reproduce the temporal signature of a real long-form human thread ·
+        <a href="https://axiomdrift.ai" target="_blank">Axiom Drift AI</a>
+      </p>
+
+    </main>
+  </div>
+</div>
+
+<script>
+// ================================================================
+// DATA — normalized to 300-point grid, model response tokens only
+// ================================================================
+const CHALK = [212,104,76,105,102,66,71,66,84,88,135,319,432,221,198,239,157,130,128,111,102,113,128,138,161,159,144,147,134,126,131,111,122,149,363,489,232,122,180,221,185,323,278,100,174,344,162,148,129,129,196,208,234,190,235,184,145,167,176,165,149,190,225,171,159,175,163,171,167,137,151,201,114,178,307,410,256,244,243,168,189,251,407,169,262,204,163,382,170,195,113,248,148,203,130,199,177,211,129,209,185,195,275,263,243,296,231,178,172,191,301,280,207,228,294,303,266,228,169,256,149,169,181,205,347,139,212,293,184,236,204,181,201,150,233,158,221,191,271,199,146,184,202,186,163,176,210,270,250,239,239,144,151,237,244,249,259,273,117,78,71,104,164,167,278,229,264,201,157,210,176,283,212,226,224,509,679,743,533,141,202,600,441,617,697,284,442,621,269,117,128,128,192,229,211,229,242,147,225,463,434,156,89,210,208,230,303,298,314,249,316,357,305,287,248,166,204,298,268,342,288,325,356,290,261,306,343,363,364,382,392,371,396,416,333,325,321,292,358,241,190,410,384,394,378,349,257,113,364,379,399,408,378,411,377,413,469,396,430,386,385,379,343,378,364,325,215,231,326,342,521,650,547,347,504,519,411,346,231,236,216,136,269,371,298,349,310,187,117,181,239,349,162,310,398,311,302,335,251,306];
+const SPARSE = [32,16,49,132,232,194,13,19,17,5,2,5,12,13,13,13,7,3,3,22,24,8,15,14,3,61,78,42,67,77,65,47,40,47,38,32,29,44,57,65,42,28,28,23,112,327,173,58,40,205,241,73,38,84,226,126,44,26,193,235,61,30,48,117,259,276,89,161,237,269,151,77,110,233,254,86,124,212,334,175,61,95,110,93,23,6,3,10,20,24,16,9,8,18,13,11,18,11,16,47,66,67,38,228,340,199,108,43,13,4,5,19,20,18,14,38,49,17,21,29,31,23,24,51,123,171,139,139,135,96,113,146,180,224,267,301,222,146,162,150,128,105,173,227,165,170,183,158,116,91,135,128,111,119,129,141,151,181,187,94,94,142,236,158,63,134,203,226,84,88,167,306,205,62,124,242,314,115,141,225,167,150,163,230,213,169,170,186,200,173,181,189,116,114,138,125,117,114,122,123,123,143,108,63,114,143,149,95,82,85,57,69,101,128,132,133,192,193,161,129,126,129,64,62,94,111,164,222,167,135,118,100,96,98,77,137,231,175,127,91,121,152,177,145,112,80,68,149,278,221,162,109,146,203,264,203,177,176,183,236,311,215,192,222,199,175,152,152,150,147,165,177,184,178,206,257,214,215,254,281,257,190,206,231,260,204,161,133,201,223,202,244,230,161,126,125,157,112,76,47];
+const EFFUSIVE = [192,577,602,264,806,836,332,911,944,392,779,773,330,775,818,402,988,1014,386,856,872,333,782,793,252,183,111,13,14,13,3,9,13,12,16,22,28,20,23,40,50,53,45,29,20,21,35,52,72,127,157,147,204,277,363,532,610,542,242,84,172,343,447,435,385,371,421,418,409,404,449,490,514,543,476,250,161,130,161,433,483,85,45,53,44,34,31,39,43,46,49,69,85,88,99,123,167,175,171,156,207,226,150,143,145,135,121,106,88,103,112,93,112,124,98,113,122,94,143,186,172,201,211,147,129,128,142,152,153,134,152,172,170,157,146,149,143,134,127,163,230,341,382,422,520,529,449,190,146,165,159,114,90,174,199,188,128,144,182,200,200,193,190,184,188,230,237,237,262,208,158,232,334,410,346,284,228,192,206,220,153,164,213,277,263,227,248,216,177,221,257,266,169,269,406,282,281,324,296,308,339,363,346,311,289,266,252,293,317,314,204,210,278,343,287,192,267,347,412,370,318,265,247,279,331,321,305,288,294,346,407,328,309,320,263,256,278,273,198,98,178,223,230,103,74,115,194,265,321,299,282,268,241,260,309,336,333,312,339,298,216,290,293,241,219,209,210,229,222,195,206,199,179,207,236,266,287,284,262,257,266,282,178,98,42,116,155,161,219,216,158,187,233,294,169,103,93,114,106,69];
+const STRUCTURED = [177,94,64,88,209,240,179,233,253,235,165,101,44,56,116,228,154,118,130,133,138,146,88,57,60,116,122,66,85,102,113,121,130,141,90,84,137,155,166,172,85,96,244,288,235,60,78,112,147,127,119,136,112,119,176,106,66,90,91,94,103,102,99,97,145,148,71,81,97,103,126,157,195,119,69,90,94,99,112,153,151,66,81,103,109,124,142,165,108,70,91,105,139,214,128,63,98,98,104,135,149,154,147,94,58,78,126,149,109,145,168,128,130,140,148,160,149,89,89,115,167,195,193,132,145,156,114,137,161,148,166,182,171,133,82,18,2,3,9,13,14,9,6,3,1,10,17,7,3,6,23,16,4,2,22,42,35,19,4,2,18,33,25,12,7,35,27,8,2,16,34,38,21,6,32,34,24,6,17,34,30,17,4,2,19,39,27,13,5,25,30,24,9,3,5,28,33,26,7,16,33,20,9,5,30,35,26,7,16,35,26,14,5,31,35,27,10,3,4,25,31,27,10,3,4,24,31,27,10,3,4,27,36,33,10,20,47,40,23,4,33,41,33,10,18,42,31,17,3,32,41,33,11,17,42,36,21,3,25,33,30,10,19,48,39,22,3,30,41,36,12,16,41,33,20,4,2,18,48,42,26,2,30,39,32,11,15,40,33,19,2,38,49,35,12,14,40,35,22,1];
+const PROFILES = {
+  sparse:     { data: SPARSE,     label: 'Sparse',     desc: 'Minimal, near-zero input entropy. Single-word and monosyllabic user turns.' },
+  effusive:   { data: EFFUSIVE,   label: 'Effusive',   desc: 'High-density, sustained high-affect input. Enthusiastic, verbose user turns throughout.' },
+  structured: { data: STRUCTURED, label: 'Structured', desc: 'Systematic, pedagogically-driven input. User builds on each response in sequence.' },
+};
+// X axis: normalized 0–100%
+const X = Array.from({length: 300}, (_, i) => Math.round(i / 299 * 1000) / 10);
+// ================================================================
+// CHART SETUP
+// ================================================================
+const FONT     = "'Instrument Sans', sans-serif";
+const C_TEXT   = '#1f1d19';
+const C_MUTED  = '#5c564e';
+const C_ACCENT = '#455241';
+const sharedLegend = {
+  position: 'bottom',
+  labels: { font: { family: FONT, size: 11 }, color: C_MUTED, boxWidth: 9, boxHeight: 9, padding: 16, usePointStyle: true, pointStyleWidth: 9 }
+};
+const sharedTooltip = {
+  backgroundColor: 'rgba(255,255,255,0.94)', borderColor: 'rgba(40,38,33,0.14)', borderWidth: 1,
+  titleColor: C_TEXT, bodyColor: C_MUTED,
+  titleFont: { family: FONT, size: 12, weight: '500' }, bodyFont: { family: FONT, size: 11 },
+  padding: 10, cornerRadius: 10,
+  callbacks: { label: c => ` ${Math.round(c.parsed.x)}%  ·  ${Math.round(c.parsed.y)} tokens` }
+};
+function makeScales(yMax) {
+  return {
+    x: {
+      title: { display: true, text: 'Normalized interaction time (%)', color: C_MUTED, font: { family: FONT, size: 11 } },
+      grid: { color: 'rgba(40,38,33,0.05)' },
+      ticks: { color: C_MUTED, font: { family: FONT, size: 11 }, callback: v => v + '%' },
+      min: 0, max: 100,
+    },
+    y: {
+      title: { display: true, text: 'Est. tokens', color: C_MUTED, font: { family: FONT, size: 11 } },
+      grid: { color: 'rgba(40,38,33,0.05)' },
+      ticks: { color: C_MUTED, font: { family: FONT, size: 11 } },
+      min: 0, ...(yMax ? { max: yMax } : {}),
+    }
+  };
+}
+const CH = {};
+function mkChart(id, datasets, yMax) {
+  if (CH[id]) CH[id].destroy();
+  CH[id] = new Chart(document.getElementById(id), {
+    type: 'scatter',
+    data: { datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 260 },
+      plugins: { legend: sharedLegend, tooltip: sharedTooltip },
+      scales: makeScales(yMax),
+    }
+  });
+  return CH[id];
+}
+// ================================================================
+// ANALYSIS
+// ================================================================
+function rollingStats(arr, w) {
+  return arr.map((_, i) => {
+    const slice = arr.slice(Math.max(0, i - w + 1), i + 1);
+    const n    = slice.length;
+    const mean = slice.reduce((a, b) => a + b, 0) / n;
+    const std  = n > 1 ? Math.sqrt(slice.reduce((a, b) => a + (b - mean) ** 2, 0) / n) : 0;
+    return { mean, std };
+  });
+}
+function buildDatasets(data, color, label, w, showBand, bw) {
+  const stats   = rollingStats(data, w);
+  const scatter = data.map((y, i) => ({ x: X[i], y }));
+  const meanPts = stats.map((r, i) => ({ x: X[i], y: Math.round(r.mean) }));
+  const upPts   = stats.map((r, i) => ({ x: X[i], y: Math.round(Math.max(0, r.mean + bw * r.std)) }));
+  const loPts   = stats.map((r, i) => ({ x: X[i], y: Math.round(Math.max(0, r.mean - bw * r.std)) }));
+  const sets = [
+    { label, type: 'scatter', data: scatter, backgroundColor: color.replace(')',',0.26)').replace('rgb','rgba'), pointRadius: 2, pointHoverRadius: 4, order: 4 },
+    { label: `Rolling mean (w = ${w})`, type: 'line', data: meanPts, borderColor: C_TEXT, borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false, order: 1 },
+  ];
+  if (showBand) {
+    sets.push(
+      { label: `+${bw.toFixed(1)}σ`, type: 'line', data: upPts, borderColor: 'transparent', borderWidth: 0, pointRadius: 0, tension: 0.3, fill: false, order: 3 },
+      { label: `±${bw.toFixed(1)}σ band`, type: 'line', data: loPts, borderColor: 'transparent', borderWidth: 0, pointRadius: 0, tension: 0.3, fill: '-1', backgroundColor: color.replace(')',',0.08)').replace('rgb','rgba'), order: 3 }
+    );
+  }
+  return sets;
+}
+// ================================================================
+// RENDER
+// ================================================================
+function render() {
+  const profileKey = document.getElementById('profileSelect').value;
+  const w          = +document.getElementById('windowSlider').value;
+  const showBand   = document.getElementById('showBand').checked;
+  const bw         = +document.getElementById('bandSlider').value;
+  const shared     = document.getElementById('sharedScale').checked;
+  const profile = PROFILES[profileKey];
+  // Shared y max
+  let yMax = null;
+  if (shared) {
+    yMax = Math.ceil(Math.max(...CHALK, ...profile.data) * 1.05 / 50) * 50;
+  }
+  // Chalk chart
+  mkChart('chalkChart',
+    buildDatasets(CHALK, 'rgb(69,82,65)', 'Chalk', w, showBand, bw),
+    yMax
+  );
+  // Profile chart
+  mkChart('profileChart',
+    buildDatasets(profile.data, 'rgb(138,119,92)', profile.label, w, showBand, bw),
+    yMax
+  );
+  // Update labels
+  document.getElementById('profileTitle').textContent = profile.label;
+  document.getElementById('profileDesc').textContent  = profile.desc;
+  document.getElementById('profileStatLabel').textContent = `${profile.label} — mean response`;
+  // Stats
+  const cMean = Math.round(CHALK.reduce((a,b) => a+b,0) / CHALK.length);
+  const pMean = Math.round(profile.data.reduce((a,b) => a+b,0) / profile.data.length);
+  const cStd  = Math.round(Math.sqrt(CHALK.reduce((a,b) => a + (b-cMean)**2,0) / CHALK.length));
+  const pStd  = Math.round(Math.sqrt(profile.data.reduce((a,b) => a + (b-pMean)**2,0) / profile.data.length));
+  document.getElementById('chalkMean').textContent   = `${cMean} tokens`;
+  document.getElementById('profileMean').textContent = `${pMean} tokens`;
+  document.getElementById('chalkStd').textContent    = `σ = ${cStd}`;
+  document.getElementById('profileStd').textContent  = `σ = ${pStd}`;
+  // Interpretation
+  const ratio = (pMean / cMean * 100).toFixed(0);
+  let interp = '';
+  if (profileKey === 'sparse') {
+    interp = `<strong>Sparse</strong> produces ${ratio}% of Chalk's mean response volume. Despite beginning with moderate variance, response length collapses in the mid-thread as the model exhausts strategies for engaging with near-empty input. The temporal structure diverges markedly from Chalk, where sustained human input maintains model output across the full thread.`;
+  } else if (profileKey === 'effusive') {
+    interp = `<strong>Effusive</strong> drives unusually high early responses (peak ${Math.max(...profile.data)} tokens) before a structural collapse around the midpoint, then partial recovery. This burst-collapse-recovery pattern does not appear in Chalk. High-affect input without substantive content produces an unstable temporal signature distinct from genuine human interaction.`;
+  } else {
+    interp = `<strong>Structured</strong> produces ${ratio}% of Chalk's mean volume and maintains moderate consistency through the first half before a near-complete collapse. Pedagogically-driven input sustains model engagement longer than Sparse but cannot reproduce the sustained variability of Chalk — the model's temporal signature under controlled input converges toward exhaustion rather than equilibrium.`;
+  }
+  document.getElementById('interpText').innerHTML = interp;
+}
+// ================================================================
+// CONTROLS
+// ================================================================
+function wireSlider(id, dispId, dec, fn) {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => {
+    if (dispId) document.getElementById(dispId).textContent = dec ? parseFloat(el.value).toFixed(dec) : el.value;
+    fn();
+  });
+}
+wireSlider('windowSlider', 'windowVal', 0, render);
+wireSlider('bandSlider',   'bandVal',   1, render);
+document.getElementById('showBand').addEventListener('change', e => {
+  document.getElementById('bandRow').style.opacity = e.target.checked ? '1' : '0.4';
+  render();
+});
+document.getElementById('profileSelect').addEventListener('change', render);
+document.getElementById('sharedScale').addEventListener('change', render);
+render();
+</script>
+</body>
+</html>
